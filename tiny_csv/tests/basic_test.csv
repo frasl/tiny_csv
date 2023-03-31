@@ -1,0 +1,14 @@
+id,short_num,long_num,simple_string,date,escaped_string
+0,12,123454567788,ABC,2023-03-29,"Some excaped quotes say \"Weee!\""
+1,12,123454567788,ABC1,2023-03-29,"Some excaped quotes say \"Weee!\""
+2,12,123454567788,ABC2,2023-03-29,"Some excaped quotes say \"Weee!\""
+3,12,123454567799,ABC3,2023-03-29,"Some excaped quotes say \"Weee!\""
+4,12,123454567788,ABC4,2023-03-29,"Some excaped quotes say \"Weee!\""
+5,12,123454567788,ABC5,2023-03-29,"Some excaped quotes say \"Weee!\""
+6,12,123454567788,ABC6,2023-03-29,"Some excaped quotes say \"Weee!\""
+7,12,123454567788,ABC7,2023-03-29,"Some excaped quotes say \"Weee!\""
+8,12,123454567788,ABC8,2023-03-29,"Some excaped quotes say \"Weee!\""
+9,12,123454567788,ABC9,2023-03-29,"Some excaped quotes say \"Weee!\""
+10,12,123454567788,ABC10,2023-03-29,"Some excaped quotes say \"Weee!\""
+
+
