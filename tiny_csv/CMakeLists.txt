@@ -18,6 +18,7 @@ set(TINY_CSV_HEADERS
     include/tiny_csv/tokenizer.hpp
     include/tiny_csv/multimatch.hpp
     include/tiny_csv/text_buffer.hpp
+    include/tiny_csv/config.hpp
 )
 
 # Create the library target

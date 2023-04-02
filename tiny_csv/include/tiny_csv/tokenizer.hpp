@@ -1,5 +1,6 @@
 #include <tiny_csv/multimatch.hpp>
 #include <tiny_csv/text_buffer.hpp>
+#include <tiny_csv/config.hpp>
 
 #include <cctype>
 #include <tuple>
@@ -9,8 +10,7 @@ namespace tiny_csv {
 
 class Tokenizer {
 public:
-    Tokenizer(const char_t escape, const char_t quote,
-              const MultiMatch &token_separators, const MultiMatch &line_separators);
+    Tokenizer(const ParserConfig &cfg);
 
     void Reset(const char_t *buf, size_t size);
 
@@ -28,10 +28,10 @@ private:
     size_t      size_;
     size_t      offset_ { 0 };
 
-    const MultiMatch   &token_separators;
-    const MultiMatch   &line_separators;
-    const char_t        quote_;
-    const char_t        escape_;
+    // Configuration
+    const ParserConfig cfg_;
+    const MultiMatch   token_separators_;
+    const MultiMatch   line_separators_;
 
 };
 

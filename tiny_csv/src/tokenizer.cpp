@@ -4,14 +4,12 @@
 
 using namespace tiny_csv;
 
-Tokenizer::Tokenizer(const char_t escape, const char_t quote,
-                     const MultiMatch &token_separators, const MultiMatch &line_separators) :
+Tokenizer::Tokenizer(const ParserConfig &cfg) :
         buf_(nullptr),
         size_(0),
-        token_separators(token_separators),
-        line_separators(line_separators),
-        quote_(quote),
-        escape_(escape) {}
+        cfg_(cfg),
+        line_separators_( { '\n', '\r', '\0' } ),
+        token_separators_( { cfg.token_separator, '\0' } ) {}
 
 bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
     enum State {
@@ -38,12 +36,12 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
         switch (state) {
             case InToken:
-                if (c == quote_) {
+                if (c == cfg_.quote_char) {
                     if (size > 0)
                         throw std::logic_error("Quotes not allowed in the middle of the column");
 
                     state = InQuotes;
-                } else if (token_separators.Check(c)) {
+                } else if (token_separators_.Check(c)) {
                     offset_ += (size + 1);
                     return true; // Reached end of a valid token
                 } else {
@@ -53,10 +51,10 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
                 break;
 
             case InQuotes:
-                if (c == escape_) {
+                if (c == cfg_.escape_char) {
                     prev_state = state;
                     state = InEscape;
-                } else if (c == quote_) {
+                } else if (c == cfg_.quote_char) {
                     state = TokenEnd;
                 } else {
                     token.PushBack(c);
@@ -70,7 +68,7 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
                 break;
 
             case TokenEnd:
-                if (token_separators.Check(c)) {
+                if (token_separators_.Check(c)) {
                     offset_ += (size + 1);
                     return true; // Reached end of a valid token
                 } else {
@@ -87,7 +85,7 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
 bool Tokenizer::NextLine(TextBuffer<char_t> &line) {
     line.Clear();
-    for (const char *ptr = buf_ + offset_; !line_separators.Check(*ptr); ptr = buf_ + (++offset_)) {
+    for (const char *ptr = buf_ + offset_; !line_separators_.Check(*ptr); ptr = buf_ + (++offset_)) {
         if (offset_ >= size_)
             return false; // No more data will follow
 
@@ -95,7 +93,7 @@ bool Tokenizer::NextLine(TextBuffer<char_t> &line) {
     }
 
     // Chew trailing separators
-    for (const char *ptr = buf_ + offset_; line_separators.Check(*ptr) && offset_ < size_; ptr = buf_ + (++offset_));
+    for (const char *ptr = buf_ + offset_; line_separators_.Check(*ptr) && offset_ < size_; ptr = buf_ + (++offset_));
 
     return true;
 }

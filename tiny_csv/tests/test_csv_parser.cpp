@@ -8,29 +8,80 @@
 namespace /* anonymous */
 {
 
+TEST(TinyCSV, DefaultLoaders) {
+    using Columns = tiny_csv::ColTuple<char, int, std::string>;
+    Columns::DefaultLoaders ldr;
+
+    static_assert(std::is_same_v<std::tuple_element<0, Columns::DefaultLoaders>::type ,
+                                 tiny_csv::Loader<char>>, "Default loaders construct incorrectly");
+    static_assert(std::is_same_v<std::tuple_element<1, Columns::DefaultLoaders>::type,
+                                 tiny_csv::Loader<int>>, "Default loaders construct incorrectly");
+    static_assert(std::is_same_v<std::tuple_element<2, Columns::DefaultLoaders>::type,
+                                 tiny_csv::Loader<std::string>>, "Default loaders construct incorrectly");
+
+    static_assert(std::is_same_v<std::tuple<char, int, std::string>, Columns::ColTypesTuple>,
+            "Column types constructed incorrectly");
+}
+
+TEST(TinyCSV, CustomLoaders) {
+    using Columns = tiny_csv::ColTuple<int, int>;
+    struct CustomIntLoader {
+        static int Load(const char *buf, size_t len, const tiny_csv::ParserConfig &cfg) {
+            int val;
+            std::from_chars(buf, buf + len, val);
+            return -val; // To distinguish value in test
+        }
+    };
+    std::string s_csv("1,1\n3,3\n5,5");
+    tiny_csv::TinyCSV<Columns, std::tuple<tiny_csv::Loader<int>, CustomIntLoader>> csv;
+    csv.Append(s_csv.data(), s_csv.size());
+    for (const auto &row: csv) {
+        EXPECT_EQ(std::get<0>(row), -std::get<1>(row));
+    }
+}
+
+
+TEST(TinyCSV, SizeAndIteration) {
+    using Columns = tiny_csv::ColTuple<int, int>;
+    tiny_csv::TinyCSV<Columns> csv;
+    std::string s_csv("1,2\n3,4\n5,6");
+    csv.Append(s_csv.data(), s_csv.size());
+
+    EXPECT_EQ(csv.Size(), 3);
+    size_t i = 0;
+    for (const auto &row: csv) {
+        EXPECT_EQ(row, csv[i++]);
+    }
+}
+
+
 TEST(TinyCSV, ColTranslation) { // Test translation of index id into column id
-    auto col_id = tiny_csv::TinyCSV<std::tuple<char, int, char>, 0, 2>::Idx2ColId<0>();
+    using Columns = tiny_csv::ColTuple<char, int, char>;
+    auto col_id = tiny_csv::TinyCSV<Columns, Columns::DefaultLoaders, 0, 2>::Idx2ColId<0>();
     EXPECT_EQ(col_id, 0);
 
-    col_id = tiny_csv::TinyCSV<std::tuple<char, int, char>, 0, 2>::Idx2ColId<1>();
+    col_id = tiny_csv::TinyCSV<Columns, Columns::DefaultLoaders, 0, 2>::Idx2ColId<1>();
     EXPECT_EQ(col_id, 2);
 }
 
 TEST(TinyCSV, LoadCSV) {
-        auto csv =
-                tiny_csv::CreateFromFile<std::tuple<int, uint16_t, int64_t, std::string, std::string, std::string>,
-                        0, 2, 4>("basic_test.csv",
-                                 {"id", "short_num", "long_num", "simple_string", "date", "escaped_string"});
+    using Columns = tiny_csv::ColTuple<int, uint16_t, int64_t, std::string, std::tm, std::string>;
+    auto csv =
+            tiny_csv::CreateFromFile<Columns, Columns::DefaultLoaders,
+                    0, 2, 5>("basic_test.csv",
+                             {"id", "short_num", "long_num", "simple_string", "datetime", "escaped_string"});
     auto it0 = csv.Find<0>(3); // Search by 0-th index
     EXPECT_EQ(it0.HasData(), true);
     EXPECT_EQ(std::get<2>(*it0), 123454567799);
+
+    // Check if the date has parsed correctly
+    EXPECT_EQ(std::get<4>(*it0).tm_hour,  13);
+    EXPECT_EQ(std::get<4>(*it0).tm_year,  123);
     ++it0;
     EXPECT_EQ(it0.HasData(), false);
 
     auto it2 = csv.Find<1>(123454567788); // Search by 1-st index
     EXPECT_EQ(it2.Size(), 10);
 }
-
-
 
 } // namespace

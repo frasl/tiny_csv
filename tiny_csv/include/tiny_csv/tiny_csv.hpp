@@ -12,7 +12,14 @@
 
 namespace tiny_csv {
 
-template<typename RowType, size_t ...IndexCols>
+template<typename... ColType>
+struct ColTuple : public std::tuple<ColType...>
+{
+    using ColTypesTuple = typename std::tuple<ColType...>;
+    using DefaultLoaders = typename std::tuple<Loader<ColType>...>;
+};
+
+template<typename RowType, typename RowLoaders = typename RowType::DefaultLoaders, size_t ...IndexCols>
 class TinyCSV {
     // Constraints
 
@@ -23,13 +30,13 @@ class TinyCSV {
 
 public:
     template <typename RT, size_t col_idx> class Index {
-        friend class TinyCSV<RowType, IndexCols...>;
+        friend class TinyCSV<RowType, RowLoaders, IndexCols...>;
 
         Index(std::shared_ptr<std::vector<RowType>> &data) : data_(data) {}
         Index() = delete;
 
     public:
-        using ColType = typename std::tuple_element<col_idx, RowType>::type;
+        using ColType = typename std::tuple_element<col_idx, typename RowType::ColTypesTuple>::type;
         using IndexMapType = typename std::unordered_multimap<ColType, ValueOffset>;
         using IndexMapConstIterator = typename IndexMapType::const_iterator;
         using IndexMapIteratorPair = typename std::pair<IndexMapConstIterator, IndexMapConstIterator>;
@@ -94,7 +101,7 @@ public:
             idx_.insert({ std::get<col_idx>(row), offset });
         }
 
-        Iterator Find(typename std::tuple_element<col_idx, RowType>::type key) const {
+        Iterator Find(const typename std::tuple_element<col_idx, typename RowType::ColTypesTuple>::type &key) const {
             return Iterator(idx_.equal_range(key), data_);
         }
 
@@ -110,9 +117,10 @@ public:
     // Iterate columns and parse according to types
     template <size_t C>
     void ParseCol(RowType &row) {
-        using ColumnType = typename std::tuple_element<C, RowType>::type;
+        using ColumnType = typename std::tuple_element<C, typename RowType::ColTypesTuple>::type;
         field_tokenizer_.NextToken(token_buffer_);
-        std::get<C>(row) = Loader<ColumnType>::Load(token_buffer_.Data(), token_buffer_.Size());
+        std::get<C>(row) =
+                std::tuple_element<C, RowLoaders>::type::Load(token_buffer_.Data(), token_buffer_.Size(), cfg_);
     }
 
     template <size_t C>
@@ -126,15 +134,16 @@ public:
 
     void LineToRow(const char *data, size_t size, RowType &row) {
         field_tokenizer_.Reset(data, size);
-        IterateAndParse<std::tuple_size_v<RowType>>(row);
+        IterateAndParse<std::tuple_size_v<typename RowType::ColTypesTuple>>(row);
     }
 
-    template <size_t idx_id>
+    template <size_t idx_cnt>
     void AppendIndices(const RowType &row, size_t offset) {
-        if constexpr (idx_id > 1)
-            AppendIndices<idx_id - 1>(row, offset);
+        if constexpr(idx_cnt > 1)
+            AppendIndices<idx_cnt - 1>(row, offset);
 
-        std::get<idx_id - 1>(indices_).Add(row, offset);
+        if constexpr(idx_cnt > 0)
+            std::get<idx_cnt - 1>(indices_).Add(row, offset);
     }
 
     bool HeaderMatches(const char_t *ptr, size_t size) {
@@ -150,34 +159,24 @@ public:
     }
 
 public:
-    using IndexTupleType = std::tuple<Index<RowType, IndexCols>...>;
+    using IndexTupleType = std::tuple<Index<typename RowType::ColTypesTuple, IndexCols>...>;
 
-    TinyCSV(const std::vector<std::string> &col_headers = {},
-            char separator=',', char escape_char='\\', char quote='\"') :
-        escape_char_(escape_char),
-        quote_(quote),
-        line_separators_( { '\n', '\t', '\0' } ),
-        token_separators_( { separator, '\0' } ),
-        line_tokenizer_(escape_char_, quote_,
-                        token_separators_, line_separators_),
-        field_tokenizer_(escape_char_, quote_,
-                         token_separators_, line_separators_),
+    TinyCSV(const ParserConfig &cfg = {},
+            const std::vector<std::string> &col_headers = {}) :
+        cfg_(cfg),
         headers_(col_headers),
+        line_tokenizer_(cfg),
+        field_tokenizer_(cfg),
         header_checked_( col_headers.empty() ),
         data_(std::make_shared<std::vector<RowType>>()),
-        indices_ { Index<RowType, IndexCols>(data_)... } {}
+        indices_ { Index<typename RowType::ColTypesTuple, IndexCols>(data_)... } {}
 
-    TinyCSV(TinyCSV<RowType, IndexCols...> &&from) :
-        escape_char_(from.escape_char_),
-        quote_(from.quote_),
-        line_separators_( std::move(from.line_separators_) ),
-        token_separators_( std::move(from.token_separators_) ),
+    TinyCSV(TinyCSV<RowType, RowLoaders, IndexCols...> &&from) :
+        cfg_(std::move(from.cfg_)),
 
         // We don't need to completely copy tokenizers and buffers
-        line_tokenizer_(from.escape_char_, from.quote_,
-                        token_separators_, line_separators_),
-        field_tokenizer_(from.escape_char_, from.quote_,
-                         token_separators_, line_separators_),
+        line_tokenizer_(from.cfg_),
+        field_tokenizer_(from.cfg_),
         headers_( std::move(from.headers_) ),
         data_(std::move(from.data_)),
         indices_(std::move(from.indices_))
@@ -209,8 +208,21 @@ public:
         }
     }
 
+    // To enable simple for loops
+    typename std::vector<RowType>::const_iterator begin() const {
+        return data_->begin();
+    }
+
+    typename std::vector<RowType>::const_iterator end() const {
+        return data_->end();
+    }
+
     const RowType &operator[](size_t idx) const {
-        return data_[idx];
+        return (*data_)[idx];
+    }
+
+    size_t Size() const {
+        return data_->size();
     }
 
     template<size_t idx_id, size_t IdxCol, size_t ...IdxCols>
@@ -234,22 +246,19 @@ public:
      * Returns an iterator to rows, that match the key passed
      */
     template <size_t idx_id>
-    typename Index<RowType, Idx2ColId<idx_id>()>::Iterator Find(
-            typename std::tuple_element<Idx2ColId<idx_id>(), RowType>::type key) {
+    typename Index<typename RowType::ColTypesTuple, Idx2ColId<idx_id>()>::Iterator Find(const
+            typename std::tuple_element<Idx2ColId<idx_id>(), typename RowType::ColTypesTuple>::type &key) const {
         return std::get<idx_id>(indices_).Find(key);
     }
 
 private:
     // Configuration
-    const char escape_char_;
-    const char quote_;
+    const ParserConfig cfg_;
 
     // Maps index id to column id
     static constexpr std::tuple<size_t> index_col_ids_ { IndexCols... };
 
-    // Separator character lookups
-    MultiMatch                      line_separators_, token_separators_;
-
+    // Text buffers and tokenizers
     TextBuffer<char_t>              line_buffer_;
     TextBuffer<char_t>              token_buffer_;
     Tokenizer                       line_tokenizer_;
@@ -262,11 +271,10 @@ private:
     bool                            header_checked_;
 };
 
-template<typename RowType, size_t ...IndexCols>
-TinyCSV<RowType, IndexCols...> CreateFromFile(const std::string &filename,
-                                              const std::vector<std::string> &col_headers = {} /* No check if empty */,
-                                              char separator = ',', char escape_char = '\\',
-                                              char quote_char = '\"') {
+template<typename RowType, typename Loaders = RowType::DefaultLoaders, size_t ...IndexCols>
+TinyCSV<RowType, Loaders, IndexCols...> CreateFromFile(const std::string &filename,
+                                                       const std::vector<std::string> &col_headers = {} /* No check if empty */,
+                                                       const ParserConfig &cfg = {}) {
     std::ifstream inputFile(filename);
     if (!inputFile.is_open())
         throw std::runtime_error(fmt::format("Cannot open {}", filename));
@@ -282,7 +290,7 @@ TinyCSV<RowType, IndexCols...> CreateFromFile(const std::string &filename,
     // Read the file into the buffer
     inputFile.read(buffer.data(), size);
     if (!inputFile.fail() || inputFile.eof()) {
-        TinyCSV<RowType, IndexCols...> csv(col_headers, separator, escape_char, quote_char);
+        TinyCSV<RowType, Loaders, IndexCols...> csv(cfg, col_headers);
         csv.Append(buffer.data(), buffer.size());
 
         return csv;

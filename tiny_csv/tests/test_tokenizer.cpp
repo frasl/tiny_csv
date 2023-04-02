@@ -19,10 +19,9 @@ std::string FetchNextLine(tiny_csv::Tokenizer &tokenizer) {
 }
 
 TEST(Tokenizer, TokenizerLineTest) {
+    tiny_csv::ParserConfig cfg; // Default
     std::string test_str = "1\n2\r\n3\n\n4\n\n\n\n\n";
-    tiny_csv::MultiMatch token_separators( { ',', '\0' } );
-    tiny_csv::MultiMatch line_separators( { '\n', '\r', '\0' } );
-    tiny_csv::Tokenizer tokenizer('\\', '\"', token_separators, line_separators );
+    tiny_csv::Tokenizer tokenizer(cfg);
 
     tokenizer.Reset(test_str.c_str(), test_str.size());
     EXPECT_EQ(FetchNextLine(tokenizer), "1");
@@ -39,9 +38,8 @@ TEST(Tokenizer, TokenizerLineTest) {
 
 TEST(Tokenizer, TokenizerTokenTest) {
     std::string test_str = "17,2.5,ABCDE,-1,\"Quoted String\",\"Quoted string,\",\"Quoted, \\\"string\\\"\"";
-    tiny_csv::MultiMatch token_separators( { ',', '\0' } );
-    tiny_csv::MultiMatch line_separators( { '\n', '\r', '\0' } );
-    tiny_csv::Tokenizer tokenizer('\\', '\"', token_separators, line_separators );
+    tiny_csv::ParserConfig cfg; // Default
+    tiny_csv::Tokenizer tokenizer(cfg);
 
     tokenizer.Reset(test_str.c_str(), test_str.size());
     EXPECT_EQ(FetchNextToken(tokenizer), "17");

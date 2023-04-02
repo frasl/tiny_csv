@@ -1,8 +1,16 @@
-//
-// Created by Lenovo on 3/31/2023.
-//
+#pragma once
 
-#ifndef TINY_CSV_ROOT_CONFIG_HPP
-#define TINY_CSV_ROOT_CONFIG_HPP
+#include <tiny_csv/types.hpp>
 
-#endif //TINY_CSV_ROOT_CONFIG_HPP
+#include <string>
+
+namespace tiny_csv {
+
+struct ParserConfig {
+    char_t          escape_char { '\\' };
+    char_t          quote_char { '\"' };
+    char_t          token_separator { ',' };
+    std::string     datetime_format { "%Y-%m-%d %H:%M:%S" };
+};
+
+}
