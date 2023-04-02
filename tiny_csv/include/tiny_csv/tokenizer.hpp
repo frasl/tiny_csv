@@ -10,6 +10,10 @@ namespace tiny_csv {
 
 class Tokenizer {
 public:
+    struct ExpectedTokenNotFound : public std::out_of_range {
+        ExpectedTokenNotFound() : std::out_of_range("Expected token not found") {}
+    };
+
     Tokenizer(const ParserConfig &cfg);
 
     void Reset(const char_t *buf, size_t size);
@@ -22,6 +26,13 @@ public:
     bool HasMore() const {
         return offset_ < size_;
     }
+
+    size_t Offset() const {
+        return offset_;
+    }
+
+    // For debug and exception texts only
+    std::string DebugPrint() const;
 
 private:
     const char *buf_;

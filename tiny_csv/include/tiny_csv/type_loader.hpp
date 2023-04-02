@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <charconv>
 #include <iomanip>
+#include <optional>
 
 namespace tiny_csv {
 
@@ -50,6 +51,18 @@ struct Loader<T, std::enable_if_t<std::is_same_v<T, std::tm>>> {
         std::istringstream date_ss(s);
         date_ss >> std::get_time(&tm_time, cfg.datetime_format.c_str());
         return tm_time;
+    }
+};
+
+// Optional types - if token is of 0 length, will return std::nullopt
+template<typename T>
+struct Loader<T, std::enable_if_t<std::is_same_v<T, std::optional<typename T::value_type>>>> {
+    static T Load(const char *buf, size_t len, const ParserConfig &cfg) {
+        if (len > 0) {
+            return T(Loader<typename T::value_type>::Load(buf, len, cfg));
+        } else {
+            return std::nullopt;
+        }
     }
 };
 

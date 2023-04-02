@@ -23,6 +23,35 @@ TEST(TinyCSV, DefaultLoaders) {
             "Column types constructed incorrectly");
 }
 
+
+TEST(TinyCSV, LoadCSVOptional) {
+    const std::string fname = "optional.csv";
+    std::vector<std::string> column_names = {"UsageClass", "CheckoutType", "MaterialType", "CheckoutYear",
+                                             "CheckoutMonth", "Checkouts", "Title", "Creator", "Subjects",
+                                             "Publisher",
+                                             "PublicationYear"};
+
+    using Columns = tiny_csv::ColTuple<std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<int>,
+            std::optional<int>,
+            std::optional<int>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>>;
+
+    tiny_csv::ParserConfig cfg;
+    cfg.escape_char = '\"';
+    auto csv =
+            tiny_csv::CreateFromFile<Columns>(fname, column_names, cfg);
+
+    EXPECT_EQ(std::get<10>(csv[4]).has_value(), false);
+    EXPECT_EQ(std::get<3>(csv[4]).value(), 2006);
+}
+
 TEST(TinyCSV, CustomLoaders) {
     using Columns = tiny_csv::ColTuple<int, int>;
     struct CustomIntLoader {

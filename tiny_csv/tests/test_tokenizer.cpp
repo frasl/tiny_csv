@@ -56,4 +56,23 @@ TEST(Tokenizer, TokenizerTokenTest) {
     EXPECT_ANY_THROW(tokenizer.NextToken(buf));
 }
 
+TEST(Tokenizer, TokenizerEmptyTokenTest) {
+    std::string test_str = "12,,11,10,,,,";
+    tiny_csv::ParserConfig cfg; // Default
+    tiny_csv::Tokenizer tokenizer(cfg);
+
+    tokenizer.Reset(test_str.c_str(), test_str.size());
+    EXPECT_EQ(FetchNextToken(tokenizer), "12");
+    EXPECT_EQ(FetchNextToken(tokenizer), "");
+    EXPECT_EQ(FetchNextToken(tokenizer), "11");
+    EXPECT_EQ(FetchNextToken(tokenizer), "10");
+    EXPECT_EQ(FetchNextToken(tokenizer), "");
+    EXPECT_EQ(FetchNextToken(tokenizer), "");
+    EXPECT_EQ(FetchNextToken(tokenizer), "");
+    EXPECT_EQ(FetchNextToken(tokenizer), "");
+
+    EXPECT_EQ(tokenizer.HasMore(), false);
+}
+
+
 }

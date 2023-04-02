@@ -118,9 +118,16 @@ public:
     template <size_t C>
     void ParseCol(RowType &row) {
         using ColumnType = typename std::tuple_element<C, typename RowType::ColTypesTuple>::type;
-        field_tokenizer_.NextToken(token_buffer_);
-        std::get<C>(row) =
-                std::tuple_element<C, RowLoaders>::type::Load(token_buffer_.Data(), token_buffer_.Size(), cfg_);
+
+        try {
+            field_tokenizer_.NextToken(token_buffer_);
+            std::get<C>(row) =
+                    std::tuple_element<C, RowLoaders>::type::Load(token_buffer_.Data(), token_buffer_.Size(), cfg_);
+        }
+        catch (const std::exception &e) {
+            throw std::runtime_error(fmt::format("Column parsing exception: {} during parsing '{}'",
+                                                 e.what(), field_tokenizer_.DebugPrint()));
+        }
     }
 
     template <size_t C>
@@ -189,22 +196,30 @@ public:
     }
 
     void Append(const char *data, size_t size) {
+        size_t line = 0;
         line_tokenizer_.Reset(data, size);
 
-        while (line_tokenizer_.HasMore()) {
-            line_tokenizer_.NextLine(line_buffer_);
-            if (header_checked_) [[likely]] {
-                if (line_buffer_.Size() > 0) { // The line is not empty
-                    RowType row;
-                    LineToRow(line_buffer_.Data(), line_buffer_.Size(), row);
-                    Append(row);
-                }
-            } else {
-                if (!HeaderMatches(line_buffer_.Data(), line_buffer_.Size()))
-                    throw std::runtime_error("Header does not match");
+        try {
+            while (line_tokenizer_.HasMore()) {
+                line_tokenizer_.NextLine(line_buffer_);
+                ++line;
 
-                header_checked_ = true;
+                if (header_checked_) [[likely]] {
+                    if (line_buffer_.Size() > 0) { // The line is not empty
+                        RowType row;
+                        LineToRow(line_buffer_.Data(), line_buffer_.Size(), row);
+                        Append(row);
+                    }
+                } else {
+                    if (!HeaderMatches(line_buffer_.Data(), line_buffer_.Size()))
+                        throw std::runtime_error("Header does not match");
+
+                    header_checked_ = true;
+                }
             }
+        }
+        catch (const std::exception &e) {
+            throw std::runtime_error(fmt::format("Error at line {}: {}", line, e.what()));
         }
     }
 
@@ -275,7 +290,9 @@ template<typename RowType, typename Loaders = RowType::DefaultLoaders, size_t ..
 TinyCSV<RowType, Loaders, IndexCols...> CreateFromFile(const std::string &filename,
                                                        const std::vector<std::string> &col_headers = {} /* No check if empty */,
                                                        const ParserConfig &cfg = {}) {
-    std::ifstream inputFile(filename);
+    static const size_t READ_SIZE = 1024 * 1024;
+
+    std::ifstream inputFile(filename, std::ios::binary);
     if (!inputFile.is_open())
         throw std::runtime_error(fmt::format("Cannot open {}", filename));
 
@@ -286,17 +303,19 @@ TinyCSV<RowType, Loaders, IndexCols...> CreateFromFile(const std::string &filena
 
     // Allocate a buffer to hold the file contents
     std::vector<char> buffer(size);
-
-    // Read the file into the buffer
-    inputFile.read(buffer.data(), size);
-    if (!inputFile.fail() || inputFile.eof()) {
-        TinyCSV<RowType, Loaders, IndexCols...> csv(cfg, col_headers);
-        csv.Append(buffer.data(), buffer.size());
-
-        return csv;
-    } else {
-        throw std::runtime_error(fmt::format("Cannot read from {}", filename));
+    TinyCSV<RowType, Loaders, IndexCols...> csv(cfg, col_headers);
+    size_t total_read = 0;
+    while (total_read < size) {
+        const size_t to_read = std::min(size - total_read, READ_SIZE);
+        inputFile.read(buffer.data() + total_read, to_read);
+        if (inputFile.fail() && !inputFile.eof()) {
+            throw std::runtime_error(fmt::format("Cannot read from {}", filename));
+        }
+        total_read += to_read;
     }
+
+    csv.Append(buffer.data(), buffer.size());
+    return csv;
 }
 
 } // namespace

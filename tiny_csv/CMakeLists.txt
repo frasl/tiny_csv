@@ -30,10 +30,13 @@ target_link_libraries(tiny_csv PUBLIC
 # Add test executable
 add_executable(tiny_csv_tests
         tests/test_csv_parser.cpp
-        tests/test_tokenizer.cpp)
+        tests/test_tokenizer.cpp
+        tests/test_perf.cpp)
 target_link_libraries(tiny_csv_tests PRIVATE
         tiny_csv
         GTest::gtest_main)
+target_compile_definitions(tiny_csv_tests PRIVATE
+        TEST_PERFORMANCE)
 
 include(GoogleTest)
 gtest_discover_tests(tiny_csv_tests)
@@ -45,4 +48,7 @@ add_custom_command(TARGET tiny_csv_tests POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/tiny_csv/tests/basic_test.csv
         $<TARGET_FILE_DIR:tiny_csv_tests>/basic_test.csv
         )
-
+add_custom_command(TARGET tiny_csv_tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/tiny_csv/tests/optional.csv
+        $<TARGET_FILE_DIR:tiny_csv_tests>/optional.csv
+        )

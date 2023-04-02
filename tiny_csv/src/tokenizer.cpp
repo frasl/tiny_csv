@@ -13,8 +13,10 @@ Tokenizer::Tokenizer(const ParserConfig &cfg) :
 
 bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
     enum State {
+        InSeparator,
         InToken,
         InQuotes,
+        InDblQuotes,
         InEscape,
         TokenEnd,
         Invalid
@@ -22,19 +24,35 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
     token.Clear();
     if (offset_ >= size_)
-        throw std::runtime_error("Expected token not found");
+        throw ExpectedTokenNotFound();
 
     const char *ptr = buf_ + offset_;
+    if (token_separators_.Check(*ptr))
+        ptr = buf_ + (++offset_);
 
     size_t size = 0;
-    State state = InToken, prev_state = Invalid;
+    State state = InToken;
+    State prev_state = Invalid; // CSV format gives us a luxury of not having a full-scale stack here
     for (char_t c = ptr[size]; ; c=ptr[++size]) {
         if (offset_ + size >= size_) {
-            offset_ += (size + 1);
+            offset_ += size;
             return false; // Token ends together with the input
         }
 
+
         switch (state) {
+            /*case InSeparator:
+                if (!token_separators_.Check(c)) { [[likely]]
+                    // Pass the char back to main algo
+                    --size;
+                    continue;
+                } else {
+                    // Return an empty field
+                    ++offset_;
+                    return true;
+                }
+
+                break;*/
             case InToken:
                 if (c == cfg_.quote_char) {
                     if (size > 0)
@@ -42,7 +60,7 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
                     state = InQuotes;
                 } else if (token_separators_.Check(c)) {
-                    offset_ += (size + 1);
+                    offset_ += size;
                     return true; // Reached end of a valid token
                 } else {
                     token.PushBack(c);
@@ -51,7 +69,15 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
                 break;
 
             case InQuotes:
-                if (c == cfg_.escape_char) {
+                if (cfg_.quote_char == cfg_.escape_char) {
+                    // Some CSVs use "" to escape quotes
+                    if (c == cfg_.quote_char) {
+                        prev_state = state;
+                        state = InDblQuotes;
+                    } else {
+                        token.PushBack(c);
+                    }
+                } else if (c == cfg_.escape_char) {
                     prev_state = state;
                     state = InEscape;
                 } else if (c == cfg_.quote_char) {
@@ -62,6 +88,21 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
                 break;
 
+            case InDblQuotes:
+                if (c == cfg_.quote_char) {
+                    // Double quotes, indeed
+                    token.PushBack(c);
+                    prev_state = state;
+                    state = InQuotes;
+                } else if (token_separators_.Check(c) || offset_ + size == size_) {
+                    // Not the case, it was quotes termination, token ends
+                    offset_ += size;
+                    return true; // Reached end of a valid token
+                } else {
+                    throw std::logic_error("Unexpected character after a quote");
+                }
+                break;
+
             case InEscape:
                 token.PushBack(c);
                 state = prev_state;
@@ -69,7 +110,7 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
             case TokenEnd:
                 if (token_separators_.Check(c)) {
-                    offset_ += (size + 1);
+                    offset_ += size;
                     return true; // Reached end of a valid token
                 } else {
                     throw std::logic_error("Quotation must end together with the token");
@@ -102,4 +143,8 @@ void Tokenizer::Reset(const char_t *buf, size_t size) {
     buf_ = buf;
     size_ = size;
     offset_ = 0;
+}
+
+std::string Tokenizer::DebugPrint() const {
+    return std::string(buf_, size_);
 }
