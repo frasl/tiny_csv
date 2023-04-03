@@ -30,6 +30,7 @@ cfg_(std::move(from.cfg_)),
 // We don't need to completely copy tokenizers and buffers
 line_tokenizer_(from.cfg_),
 field_tokenizer_(from.cfg_),
+header_checked_( from.header_checked_ ),
 headers_( std::move(from.headers_) ),
 data_(std::move(from.data_)),
 indices_(std::move(from.indices_)) {}

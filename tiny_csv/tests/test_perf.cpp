@@ -60,6 +60,43 @@ TEST(Performance, Optionals) {
 
 // This test uses https://www.kaggle.com/datasets/city-of-seattle/seattle-checkouts-by-title cut down to 1M lines
 // Can be found in perf-test.zip
+TEST(Performance, OptionalsIdx) {
+    const std::string fname = "perf-test.csv";
+    std::vector<std::string> column_headers = {"UsageClass", "CheckoutType", "MaterialType", "CheckoutYear",
+                                               "CheckoutMonth", "Checkouts", "Title", "Creator", "Subjects",
+                                               "Publisher",
+                                               "PublicationYear"};
+
+    using Columns = tiny_csv::ColTuple<std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<int>,
+            std::optional<int>,
+            std::optional<int>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>>;
+
+    tiny_csv::ParserConfig cfg;
+    cfg.escape_char = '\"';
+
+    int64_t size = getFileSize(fname);
+    int64_t t_begin = getTimestampMicroseconds();
+
+    auto csv =
+            tiny_csv::CreateFromFile<Columns, Columns::DefaultLoaders, 3, 4, 5, 6>(fname, column_headers, cfg);
+
+    int64_t duration = getTimestampMicroseconds() - t_begin;
+
+    std::cout << fmt::format("Simple read of {} MB file (with 4 columns indexed) took {} usec, giving {} MB/sec performance (all cols optional, ints parsed)",
+                             size / 1048576, duration, (double)size / duration) << std::endl;
+}
+
+
+// This test uses https://www.kaggle.com/datasets/city-of-seattle/seattle-checkouts-by-title cut down to 1M lines
+// Can be found in perf-test.zip
 TEST(Performance, Optionals8T) {
     const std::string fname = "perf-test.csv";
     std::vector<std::string> column_headers = {"UsageClass", "CheckoutType", "MaterialType", "CheckoutYear",
@@ -87,6 +124,42 @@ TEST(Performance, Optionals8T) {
 
     auto csv =
             tiny_csv::CreateFromFileMT<Columns, Columns::DefaultLoaders>(fname, column_headers, cfg, 8);
+
+    int64_t duration = getTimestampMicroseconds() - t_begin;
+
+    std::cout << fmt::format("8-thread read of {} MB file took {} usec, giving {} MB/sec performance (all cols optional, ints parsed)",
+                             size / 1048576, duration, (double)size / duration) << std::endl;
+}
+
+// This test uses https://www.kaggle.com/datasets/city-of-seattle/seattle-checkouts-by-title cut down to 1M lines
+// Can be found in perf-test.zip
+TEST(Performance, Optionals8TIdx) {
+    const std::string fname = "perf-test.csv";
+    std::vector<std::string> column_headers = {"UsageClass", "CheckoutType", "MaterialType", "CheckoutYear",
+                                               "CheckoutMonth", "Checkouts", "Title", "Creator", "Subjects",
+                                               "Publisher",
+                                               "PublicationYear"};
+
+    using Columns = tiny_csv::ColTuple<std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<int>,
+            std::optional<int>,
+            std::optional<int>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>,
+            std::optional<std::string>>;
+
+    tiny_csv::ParserConfig cfg;
+    cfg.escape_char = '\"';
+
+    int64_t size = getFileSize(fname);
+    int64_t t_begin = getTimestampMicroseconds();
+
+    auto csv =
+            tiny_csv::CreateFromFileMT<Columns, Columns::DefaultLoaders, 3, 4, 5, 6>(fname, column_headers, cfg, 8);
 
     int64_t duration = getTimestampMicroseconds() - t_begin;
 

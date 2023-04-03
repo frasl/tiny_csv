@@ -17,7 +17,15 @@ Out there exists half a dozen fine libraries to read CSVs, two differentiators o
 
 ## Performance
 
-It wasn't "polished" for the most optimal performance, still, you can expect an adequate one. A row/sec perf test will be added later.
+It wasn't "polished" for the most optimal performance, still, you can expect an adequate one. 
+A test was made, using 202 MB csv file, 10 columns, all optional, 3 of them integer - a fragment of a library check-out list.
+Additionally, indexes over 4 columns were created (year-month-day-title).
+- 1 thread, no index: 153 MB/sec
+- 8 threads, no index: 324 MB/sec
+- 1 thread, index enabled: 87 MB/sec
+- 8 threads, index enabled: 150 MB/sec
+Tested with Lenovo Legion laptop, Ryzen 7/SSD/Win 11
+
 
 ## How to
 
@@ -81,6 +89,27 @@ tiny_csv::TinyCSV<Columns,
     // Then proceed as usual
 ```
 
+### MultiThreading
 
+If you need to squeeze all the juice available, the library offers a multi-threaded version of CreateFromFile:
+```c++
+/***
+ * Loads CSV from file using multiple threads.
+ * Note: the function has some noticeable overheads, so don't use with small files
+ * @tparam RowType - a tuple of columns, must be a ColTuple template instance
+ * @tparam Loaders - an std::tuple of Loader classes (see readme for details)
+ * @tparam IndexCols - list of columns to build indices on
+ * @param filename - source file name
+ * @param col_headers - a vector of strings, containing expected column names
+ * @param cfg - parser configuration, see structure for details
+ * num_threads - amount of threads to use during loading. 
+ * @return
+ */
+template <typename RowType, typename Loaders = typename RowType::DefaultLoaders, size_t ...IndexCols>
+TinyCSV<RowType, Loaders, IndexCols...> CreateFromFileMT(const std::string &filename,
+                                                         const std::vector<std::string> &col_headers = {} /* No check if empty */,
+                                                         const ParserConfig &cfg = {},
+                                                         size_t num_threads = 4);
+```
 
 

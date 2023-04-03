@@ -132,4 +132,30 @@ TEST(TinyCSV, Merge) {
     EXPECT_EQ(std::get<1>(*it), 20);
 }
 
+TEST(TinyCSV, LoadCSVMT) {
+    using Columns = tiny_csv::ColTuple<int, uint16_t, int64_t, std::string, std::tm, std::string>;
+    auto csv =
+            tiny_csv::CreateFromFileMT<Columns, Columns::DefaultLoaders,
+                    0, 2, 5>("basic_test.csv",
+                             {"id", "short_num", "long_num", "simple_string", "datetime", "escaped_string"}, {}, 8);
+    auto it0 = csv.Find<0>(3); // Search by 0-th index
+    EXPECT_EQ(it0.HasData(), true);
+    EXPECT_EQ(std::get<2>(*it0), 123454567799);
+
+    // Check if the date has parsed correctly
+    EXPECT_EQ(std::get<4>(*it0).tm_hour,  13);
+    EXPECT_EQ(std::get<4>(*it0).tm_year,  123);
+    ++it0;
+    EXPECT_EQ(it0.HasData(), false);
+
+    auto it2 = csv.Find<1>(123454567788); // Search by 1-st index
+    EXPECT_EQ(it2.Size(), 10);
+
+    // The order should remain the same
+    for (size_t i = 0; i < csv.Size(); ++i) {
+        EXPECT_EQ(std::get<0>(csv[i]), i);
+    }
+}
+
+
 } // namespace
