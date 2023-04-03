@@ -103,4 +103,33 @@ TEST(TinyCSV, LoadCSV) {
     EXPECT_EQ(it2.Size(), 10);
 }
 
+TEST(TinyCSV, Merge) {
+    using Columns = tiny_csv::ColTuple<int, int>;
+    tiny_csv::TinyCSV<Columns, Columns::DefaultLoaders, 0> csv;
+    std::vector<tiny_csv::TinyCSV<Columns>> merged_csvs(2);
+    std::string s_csv1("1,2\n3,4\n5,6"), s_csv2("10,20\n30,40\n50,60");
+    merged_csvs[0].Append(s_csv1.data(), s_csv1.size());
+    merged_csvs[1].Append(s_csv2.data(), s_csv2.size());
+
+    csv.Append(merged_csvs, 4);
+
+    EXPECT_EQ(std::get<0>(csv[0]), 1);
+    EXPECT_EQ(std::get<1>(csv[0]), 2);
+    EXPECT_EQ(std::get<0>(csv[1]), 3);
+    EXPECT_EQ(std::get<1>(csv[1]), 4);
+    EXPECT_EQ(std::get<0>(csv[2]), 5);
+    EXPECT_EQ(std::get<1>(csv[2]), 6);
+    EXPECT_EQ(std::get<0>(csv[3]), 10);
+    EXPECT_EQ(std::get<1>(csv[3]), 20);
+    EXPECT_EQ(std::get<0>(csv[4]), 30);
+    EXPECT_EQ(std::get<1>(csv[4]), 40);
+    EXPECT_EQ(std::get<0>(csv[5]), 50);
+    EXPECT_EQ(std::get<1>(csv[5]), 60);
+    EXPECT_EQ(csv.Size(), 6);
+
+    auto it = csv.Find<0>(10);
+    EXPECT_EQ(it.HasData(), true);
+    EXPECT_EQ(std::get<1>(*it), 20);
+}
+
 } // namespace

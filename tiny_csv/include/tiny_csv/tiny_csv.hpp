@@ -2,6 +2,7 @@
 
 #include <tiny_csv/tokenizer.hpp>
 #include <tiny_csv/type_loader.hpp>
+#include <tiny_csv/task_queue.hpp>
 
 #include <fmt/format.h>
 
@@ -184,6 +185,17 @@ private:
     void AppendIndices(const ColumnTypeTuple &row, size_t offset);
 
     /***
+     * Recursive template function, appends index data for a given row - in parallel threads
+     * @tparam idx_cnt - amount of indices left
+     * @param start_idx - starting index in data_ to add to indices
+     * @param n_elems - amount of elements to be processed
+     * @param queue - a task queue, that will handle the job
+     */
+    template <size_t idx_cnt>
+    void AppendIndicesMT(size_t start_idx, size_t n_elems,
+                         TaskQueue<std::pair<size_t, size_t>> &queue);
+
+    /***
      * Check if header names match
      * @param ptr - pointer to the first row of text in csv
      * @param size - size of the row, bytes
@@ -227,6 +239,13 @@ public:
      * @param size - size, bytes
      */
     void Append(const char *data, size_t size);
+
+    /***
+     * Appends a vector of un-indexed CSVs into one indexed CSV.
+     * Used for multi-threaded loads.
+     * @param objs - a vector of objects to merge
+     */
+    void Append(const std::vector<TinyCSV<ColumnTypeTuple, RowLoaders>> &objs, size_t num_threads);
 
     // Basic vector-like access
     /***
@@ -305,6 +324,23 @@ template<typename RowType, typename Loaders = typename RowType::DefaultLoaders, 
 TinyCSV<RowType, Loaders, IndexCols...> CreateFromFile(const std::string &filename,
                                                        const std::vector<std::string> &col_headers = {} /* No check if empty */,
                                                        const ParserConfig &cfg = {});
+
+/***
+ * Loads CSV from file using multiple threads
+ * @tparam RowType - a tuple of columns, must be a ColTuple template instance
+ * @tparam Loaders - an std::tuple of Loader classes (see readme for details)
+ * @tparam IndexCols - list of columns to build indices on
+ * @param filename - source file name
+ * @param col_headers - a vector of strings, containing expected column names
+ * @param cfg - parser configuration, see structure for details
+ * @return
+ */
+template <typename RowType, typename Loaders = typename RowType::DefaultLoaders, size_t ...IndexCols>
+TinyCSV<RowType, Loaders, IndexCols...> CreateFromFileMT(const std::string &filename,
+                                                         const std::vector<std::string> &col_headers = {} /* No check if empty */,
+                                                         const ParserConfig &cfg = {},
+                                                         size_t num_threads = 4);
+
 
 } // namespace
 

@@ -5,10 +5,9 @@ set(TARGET_PROJECT ${LIBRARY_NAME})
 
 # Library sources
 set(TINY_CSV_SOURCES
-    src/tiny_csv.cpp
-    src/type_loader.cpp
     src/tokenizer.cpp
     src/multimatch.cpp
+    src/utility.cpp
 )
 
 # Library headers
@@ -19,6 +18,7 @@ set(TINY_CSV_HEADERS
     include/tiny_csv/multimatch.hpp
     include/tiny_csv/text_buffer.hpp
     include/tiny_csv/config.hpp
+    include/tiny_csv/task_queue.hpp
 )
 
 # Create the library target
@@ -31,7 +31,8 @@ target_link_libraries(tiny_csv PUBLIC
 add_executable(tiny_csv_tests
         tests/test_csv_parser.cpp
         tests/test_tokenizer.cpp
-        tests/test_perf.cpp)
+        tests/test_perf.cpp
+        tests/test_task_queue.cpp)
 target_link_libraries(tiny_csv_tests PRIVATE
         tiny_csv
         GTest::gtest_main)

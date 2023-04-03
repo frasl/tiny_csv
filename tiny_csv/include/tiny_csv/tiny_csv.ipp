@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tiny_csv/utility.hpp>
+
 #include <cctype>
 
 #define TINY_CSV    TinyCSV<ColumnTypeTuple, Loaders, IndexCols...>
@@ -84,6 +86,39 @@ void TINY_CSV::Append(const char *data, size_t size) {
 }
 
 template<typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>
+void TINY_CSV::Append(const std::vector<TinyCSV<ColumnTypeTuple, Loaders>> &objs, size_t num_threads) {
+    size_t total_size = 0;
+    for (const auto &obj: objs)
+        total_size += obj.Size();
+
+    size_t base_index = Size(), current_index = Size();
+    data_->resize(current_index + total_size);
+
+
+    {
+        // Offset to copy to, source object
+        using ArgsT = std::pair<size_t, const TinyCSV<ColumnTypeTuple, Loaders> &>;
+        TaskQueue<ArgsT> copy_tasks(num_threads);
+
+        // Schedule the copy
+        for (const auto &obj: objs) {
+            copy_tasks.Enqueue([this](const ArgsT &args) {
+                std::copy(args.second.begin(), args.second.end(), data_->begin() + args.first);
+            }, { current_index, obj });
+            current_index += obj.Size();
+        }
+    }
+
+    // Build indices
+    {
+        using ArgsT = std::pair<size_t, size_t>;
+        TaskQueue<ArgsT> index_tasks(num_threads);
+
+        AppendIndicesMT<std::tuple_size_v<IndexTupleType>>(base_index, total_size, index_tasks);
+    }
+}
+
+template<typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>
 typename std::vector<ColumnTypeTuple>::const_iterator TINY_CSV::begin() const { return data_->begin(); }
 
 template<typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>
@@ -130,14 +165,31 @@ void TinyCSV<ColumnTypeTuple, RowLoaders, IndexCols...>::ParseCol(ColumnTypeTupl
 }
 
 
-template<typename ColumnTypeTuple, typename RowLoaders, size_t... IndexCols>
+template<typename ColumnTypeTuple, typename Loaders, size_t... IndexCols>
 template<size_t idx_cnt>
-void TinyCSV<ColumnTypeTuple, RowLoaders, IndexCols...>::AppendIndices(const ColumnTypeTuple &row, size_t offset) {
+void TINY_CSV::AppendIndices(const ColumnTypeTuple &row, size_t offset) {
     if constexpr (idx_cnt > 1)
         AppendIndices<idx_cnt - 1>(row, offset);
 
     if constexpr (idx_cnt > 0)
         std::get<idx_cnt - 1>(indices_).Add(row, offset);
+}
+
+template<typename ColumnTypeTuple, typename Loaders, size_t... IndexCols>
+template <size_t idx_cnt>
+void TINY_CSV::AppendIndicesMT(size_t start_idx, size_t n_elems,
+                               TaskQueue<std::pair<size_t, size_t>> &queue) {
+    if constexpr (idx_cnt > 1)
+        AppendIndicesMT<idx_cnt - 1>(start_idx, n_elems, queue);
+
+    if constexpr (idx_cnt > 0) {
+        queue.Enqueue([this](const std::pair<size_t, size_t> &args) {
+            for (size_t i = args.first; i < args.first + args.second; ++i) {
+                const ColumnTypeTuple &row = (*data_)[i];
+                std::get<idx_cnt - 1>(indices_).Add(row, i);
+            }
+        }, { start_idx, n_elems });
+    }
 }
 
 template<typename ColumnTypeTuple, typename RowLoaders, size_t... IndexCols>
@@ -167,33 +219,72 @@ template<typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>
 TINY_CSV CreateFromFile(const std::string &filename,
                         const std::vector<std::string> &col_headers,
                         const ParserConfig &cfg) {
-    static const size_t READ_SIZE = 1024 * 1024;
-
-    std::ifstream inputFile(filename, std::ios::binary);
-    if (!inputFile.is_open())
-        throw std::runtime_error(fmt::format("Cannot open {}", filename));
-
-    // Determine the size of the file
-    inputFile.seekg(0, std::ios::end);
-    std::streamsize size = inputFile.tellg();
-    inputFile.seekg(0, std::ios::beg);
-
-    // Allocate a buffer to hold the file contents
-    std::vector<char> buffer(size);
+    std::vector<char> buffer;
+    Load(filename, buffer);
     TinyCSV<ColumnTypeTuple, Loaders, IndexCols...> csv(cfg, col_headers);
-    size_t total_read = 0;
-    while (total_read < size) {
-        const size_t to_read = std::min(size - total_read, READ_SIZE);
-        inputFile.read(buffer.data() + total_read, to_read);
-        if (inputFile.fail() && !inputFile.eof()) {
-            throw std::runtime_error(fmt::format("Cannot read from {}", filename));
-        }
-        total_read += to_read;
-    }
-
     csv.Append(buffer.data(), buffer.size());
     return csv;
 }
 
+template <typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>
+TINY_CSV CreateFromFileMT(const std::string &filename,
+                          const std::vector<std::string> &col_headers,
+                          const ParserConfig &cfg,
+                          size_t num_threads) {
+    static const size_t READ_SIZE = 1024 * 1024;
+
+    if (num_threads == 0)
+        throw std::logic_error("num_threads must be > 0");
+
+    std::vector<TinyCSV<ColumnTypeTuple, Loaders>> parts;
+    // First part checks the headers
+    parts.emplace_back(TinyCSV<ColumnTypeTuple, Loaders>(cfg, col_headers));
+
+    for (size_t i = 1; i < num_threads; ++i)
+        parts.emplace_back(TinyCSV<ColumnTypeTuple, Loaders>(cfg, {}));
+
+    std::vector<char_t> buffer;
+    size_t size = Load(filename, buffer);
+
+    // Now we need to approximately divide the file into portions
+    std::vector<size_t> offsets;
+    static const MultiMatch line_separators({ '\n', '\r', '\0' });
+    offsets.push_back(0);
+    for (size_t i = 1; i < num_threads; ++i)
+    {
+        size_t starting_offset = offsets[i - 1] + size / num_threads;
+        while (!line_separators.Check(buffer[starting_offset]) && starting_offset < size) {
+            ++starting_offset;
+        }
+
+        if (starting_offset < size)
+            offsets.push_back(starting_offset);
+    }
+    offsets.push_back(size);
+
+    // Fire the engines!
+    {
+        struct Args {
+            size_t fragment_begin, fragment_end;
+            size_t part_idx;
+        };
+        TaskQueue <Args> task_queue(num_threads);
+
+        for (size_t i = 1; i < num_threads; ++i) {
+            Args args{offsets[i - 1], offsets[i], i - 1};
+
+            task_queue.Enqueue([&parts, &buffer](const Args &args) {
+                parts[args.part_idx].Append(buffer.data() + args.fragment_begin,
+                                            args.fragment_end - args.fragment_begin);
+            }, args);
+        }
+    }
+
+    // And merge/index
+    TinyCSV<ColumnTypeTuple, Loaders, IndexCols...> csv(cfg, col_headers);
+    csv.Append(parts, num_threads);
+
+    return csv;
+}
 
 }
