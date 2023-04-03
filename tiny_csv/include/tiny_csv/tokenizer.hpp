@@ -10,8 +10,8 @@ namespace tiny_csv {
 
 class Tokenizer {
 public:
-    struct ExpectedTokenNotFound : public std::out_of_range {
-        ExpectedTokenNotFound() : std::out_of_range("Expected token not found") {}
+    struct ParsingException : public std::runtime_error {
+        ParsingException(const std::string &what) : std::runtime_error(what) {}
     };
 
     Tokenizer(const ParserConfig &cfg);

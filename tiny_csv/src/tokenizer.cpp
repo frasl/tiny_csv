@@ -13,7 +13,6 @@ Tokenizer::Tokenizer(const ParserConfig &cfg) :
 
 bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
     enum State {
-        InSeparator,
         InToken,
         InQuotes,
         InDblQuotes,
@@ -24,7 +23,7 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
     token.Clear();
     if (offset_ >= size_)
-        throw ExpectedTokenNotFound();
+        throw ParsingException("Expected token not found");
 
     const char *ptr = buf_ + offset_;
     if (token_separators_.Check(*ptr))
@@ -41,22 +40,10 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
 
 
         switch (state) {
-            /*case InSeparator:
-                if (!token_separators_.Check(c)) { [[likely]]
-                    // Pass the char back to main algo
-                    --size;
-                    continue;
-                } else {
-                    // Return an empty field
-                    ++offset_;
-                    return true;
-                }
-
-                break;*/
             case InToken:
                 if (c == cfg_.quote_char) {
                     if (size > 0)
-                        throw std::logic_error("Quotes not allowed in the middle of the column");
+                        throw ParsingException("Quotes not allowed in the middle of the column");
 
                     state = InQuotes;
                 } else if (token_separators_.Check(c)) {
@@ -99,7 +86,7 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
                     offset_ += size;
                     return true; // Reached end of a valid token
                 } else {
-                    throw std::logic_error("Unexpected character after a quote");
+                    throw ParsingException("Unexpected character after a quote");
                 }
                 break;
 
@@ -113,12 +100,12 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
                     offset_ += size;
                     return true; // Reached end of a valid token
                 } else {
-                    throw std::logic_error("Quotation must end together with the token");
+                    throw ParsingException("Quotation must end together with the token");
                 }
                 break;
 
             default:
-                throw std::logic_error("Token parser FSM error");
+                throw ParsingException("Token parser FSM error");
 
         }
     }

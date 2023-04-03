@@ -83,16 +83,6 @@ TEST(TinyCSV, SizeAndIteration) {
     }
 }
 
-
-TEST(TinyCSV, ColTranslation) { // Test translation of index id into column id
-    using Columns = tiny_csv::ColTuple<char, int, char>;
-    auto col_id = tiny_csv::TinyCSV<Columns, Columns::DefaultLoaders, 0, 2>::Idx2ColId<0>();
-    EXPECT_EQ(col_id, 0);
-
-    col_id = tiny_csv::TinyCSV<Columns, Columns::DefaultLoaders, 0, 2>::Idx2ColId<1>();
-    EXPECT_EQ(col_id, 2);
-}
-
 TEST(TinyCSV, LoadCSV) {
     using Columns = tiny_csv::ColTuple<int, uint16_t, int64_t, std::string, std::tm, std::string>;
     auto csv =

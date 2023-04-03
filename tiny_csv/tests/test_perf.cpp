@@ -8,6 +8,12 @@ namespace /* anonymous */
 
 #ifdef TEST_PERFORMANCE
 
+TEST(Performance, A) {
+    using Columns = tiny_csv::ColTuple<int>;
+    auto csv =
+            tiny_csv::CreateFromFile<Columns>("");
+}
+
 int64_t getTimestampMicroseconds() {
     auto now = std::chrono::system_clock::now();
     auto now_us = std::chrono::time_point_cast<std::chrono::microseconds>(now);
@@ -21,6 +27,7 @@ uint64_t getFileSize(const std::string& filename)
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     return file.tellg();
 }
+
 
 // This test uses https://www.kaggle.com/datasets/city-of-seattle/seattle-checkouts-by-title cut down to 1M lines
 // Can be found in perf-test.zip
