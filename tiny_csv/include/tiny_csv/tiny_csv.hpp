@@ -1,5 +1,10 @@
 #pragma once
 
+/***
+ * Main file to be included, has all necessary interface definitions.
+ * For usage examples see README.md
+ */
+
 #include <tiny_csv/tokenizer.hpp>
 #include <tiny_csv/type_loader.hpp>
 #include <tiny_csv/task_queue.hpp>
@@ -15,6 +20,10 @@
 
 namespace tiny_csv {
 
+/***
+ * A type to use as a wrapper for column types. Did you go see examples in README.md?
+ * @tparam ColType - A set of column types
+ */
 template<typename... ColType>
 struct ColTuple : public std::tuple<ColType...>
 {
@@ -24,8 +33,17 @@ struct ColTuple : public std::tuple<ColType...>
     static constexpr size_t num_columns = std::tuple_size_v<ColTypesTuple>;
 };
 
+/***
+ * Class, representing a CSV file
+ * @tparam ColumnTypeTuple - an instance of ColTuple, holding column types
+ * @tparam ValueLoaders - an std::tuple of Loader types. If left default, will be deduced by type as seen in type_loader.hpp
+ * If you neeed custom loaders, please see same file for inspiration (and README.md)
+ * @tparam IndexCols - A set of column ids to make indices on.
+ * Example: "0, 2, 3" will mean that index 0 will be for the column 0, index 1 will be for the column 2, index 2 - for column 3
+ * You would know this by now, if you read the README.md
+ */
 template<typename ColumnTypeTuple,
-        typename RowLoaders = typename ColumnTypeTuple::DefaultLoaders,
+        typename ValueLoaders = typename ColumnTypeTuple::DefaultLoaders,
         size_t ...IndexCols>
 class TinyCSV {
     // ============ Constraints ====================
@@ -48,7 +66,30 @@ class TinyCSV {
     };
 
     // ToDo: make a fold expression out of this mess
+    // Note: 0 is added to deal with the case when no IndexCols specified
     static_assert(CheckIndexCols<0, IndexCols...>::is_ok, "Index column Id out of range");
+
+    // Check the Loaders
+    template <size_t col_id>
+    struct CheckLoader {
+        using Loader = typename std::tuple_element<col_id, ValueLoaders>::type;
+        using LoadedType = typename std::tuple_element<col_id, typename ColumnTypeTuple::ColTypesTuple>::type;
+
+        static constexpr bool is_ok =
+                std::is_same_v<decltype(Loader::Load), LoadedType((const char *, size_t, const ParserConfig &))>;
+    };
+
+    template <size_t n_loaders>
+    static constexpr bool CheckLoaders() {
+        if constexpr(n_loaders == 0) {
+            return true;
+        } else {
+            return CheckLoader<n_loaders - 1>::is_ok && CheckLoaders<n_loaders - 1>();
+        }
+    }
+
+    static_assert(CheckLoaders<std::tuple_size_v<ValueLoaders>>(), "Value loader signature(s) do not match, see type_loader.hpp for inspiration");
+
 
     // ============ Types ====================
     using DataVector = typename std::vector<ColumnTypeTuple>;
@@ -73,7 +114,7 @@ public:
      * @tparam col_idx
      */
     template <size_t col_idx> class Index {
-        friend class TinyCSV<ColumnTypeTuple, RowLoaders, IndexCols...>;
+        friend class TinyCSV<ColumnTypeTuple, ValueLoaders, IndexCols...>;
 
         Index(std::shared_ptr<std::vector<ColumnTypeTuple>> &data) : data_(data) {}
         Index() = delete;
@@ -119,11 +160,17 @@ public:
                 return !(*this == other);
             }
 
+            /***
+             * @return true if the iterator holds a value. HasData() == false is basically equivalent to it == end() in STL
+             */
             bool HasData() const {
                 return cur_it_ != boundaries_.second;
             }
 
-            size_t Size() const {
+            /***
+             * @return Amount of elements, matching the search criteria
+             */
+            size_t NMatches() const {
                 return std::distance(boundaries_.first, boundaries_.second);
             }
 
@@ -173,7 +220,7 @@ private:
      * @param size - size, bytes
      * @param row - output row
      */
-    void LineToRow(const char *data, size_t size, ColumnTypeTuple &row);
+    void LineToRow(const char_t *data, size_t size, ColumnTypeTuple &row);
 
     /***
      * Recursive template function, appends index data for a given row
@@ -224,7 +271,7 @@ public:
     TinyCSV(const ParserConfig &cfg = {}, const std::vector<std::string> &col_headers = {});
 
     // Move constructor
-    TinyCSV(TinyCSV<ColumnTypeTuple, RowLoaders, IndexCols...> &&from);
+    TinyCSV(TinyCSV<ColumnTypeTuple, ValueLoaders, IndexCols...> &&from);
 
     /***
      * Appends a row, including index update
@@ -238,14 +285,14 @@ public:
      * @param data - pointer to data
      * @param size - size, bytes
      */
-    void Append(const char *data, size_t size);
+    void Append(const char_t *data, size_t size);
 
     /***
      * Appends a vector of un-indexed CSVs into one indexed CSV.
      * Used for multi-threaded loads.
      * @param objs - a vector of objects to merge
      */
-    void Append(const std::vector<TinyCSV<ColumnTypeTuple, RowLoaders>> &objs, size_t num_threads);
+    void Append(const std::vector<TinyCSV<ColumnTypeTuple, ValueLoaders>> &objs, size_t num_threads);
 
     // Basic vector-like access
     /***
@@ -273,7 +320,7 @@ public:
     const ColumnTypeTuple *Data() const;
 
     /***
-     * Size of loaded CSV
+     * NMatches of loaded CSV
      * @return amount of rows
      */
     size_t Size() const;

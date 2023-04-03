@@ -100,7 +100,7 @@ TEST(TinyCSV, LoadCSV) {
     EXPECT_EQ(it0.HasData(), false);
 
     auto it2 = csv.Find<1>(123454567788); // Search by 1-st index
-    EXPECT_EQ(it2.Size(), 10);
+    EXPECT_EQ(it2.NMatches(), 10);
 }
 
 TEST(TinyCSV, Merge) {
@@ -149,7 +149,7 @@ TEST(TinyCSV, LoadCSVMT) {
     EXPECT_EQ(it0.HasData(), false);
 
     auto it2 = csv.Find<1>(123454567788); // Search by 1-st index
-    EXPECT_EQ(it2.Size(), 10);
+    EXPECT_EQ(it2.NMatches(), 10);
 
     // The order should remain the same
     for (size_t i = 0; i < csv.Size(); ++i) {

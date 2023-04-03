@@ -11,6 +11,11 @@
 
 namespace tiny_csv {
 
+/***
+ * Loader classes - translate a bunch of chars into a specific C++ types.
+ * @tparam T - a type to translate to
+ */
+
 template<typename T, typename Enable = void>
 struct Loader {
     static T Load(T& t, const char *buf, size_t len, const ParserConfig &cfg) {

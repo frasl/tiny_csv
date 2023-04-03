@@ -47,7 +47,7 @@ for (const auto &row: csv) {
 Note, that if csv has a header row, you'll need to provide a string vector for the checkup. 
 
 Easy, huh? 
-There's also operator [] and Size() functions defined. 
+There's also operator [] and NMatches() functions defined. 
 
 ### Make Indices and Search
 

@@ -4,8 +4,9 @@
 
 namespace tiny_csv {
 
-/*
- * A multi-use buffer, designed to minimize reallocation during parsing
+/***
+ * A multi-use text buffer, designed to minimize memory reallocations during parsing
+ * @tparam T - character type
  */
 template <typename T>
 class TextBuffer {

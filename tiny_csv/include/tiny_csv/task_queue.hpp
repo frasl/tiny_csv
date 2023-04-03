@@ -9,6 +9,12 @@
 
 namespace tiny_csv {
 
+/***
+ * Primitive task queue. Makes worker threads, processes tasks.
+ * Will automatically join all threads on destruction, so execution can be conveniently controlled
+ * together with the object lifetime
+ * @tparam T - type of arguments, passed to a task
+ */
 template<typename T>
 class TaskQueue {
 public:

@@ -8,6 +8,10 @@
 
 namespace tiny_csv {
 
+/***
+ * Ugly workhorse. Splits test to lines, lines to tokens. Got a hardcoded FSM inside.
+ * Todo: implement template-based FSM, make it pretty. Or use 3-rd party.
+ */
 class Tokenizer {
 public:
     struct ParsingException : public std::runtime_error {

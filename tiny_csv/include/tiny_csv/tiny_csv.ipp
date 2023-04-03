@@ -58,7 +58,7 @@ void TINY_CSV::Append(const ColumnTypeTuple &row) {
 }
 
 template<typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>
-void TINY_CSV::Append(const char *data, size_t size) {
+void TINY_CSV::Append(const char_t *data, size_t size) {
     size_t line = 0;
     line_tokenizer_.Reset(data, size);
 
@@ -138,7 +138,7 @@ constexpr auto TinyCSV<ColumnTypeTuple, RowLoaders, IndexCols...>::Index<col_idx
 
 template<typename ColumnTypeTuple, typename RowLoaders, size_t... IndexCols>
 void TinyCSV<ColumnTypeTuple, RowLoaders, IndexCols...>::LineToRow(
-        const char *data, size_t size, ColumnTypeTuple &row) {
+        const char_t *data, size_t size, ColumnTypeTuple &row) {
     field_tokenizer_.Reset(data, size);
     IterateAndParse<std::tuple_size_v<typename ColumnTypeTuple::ColTypesTuple>>(row);
 }

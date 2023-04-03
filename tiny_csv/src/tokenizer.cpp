@@ -38,7 +38,6 @@ bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
             return false; // Token ends together with the input
         }
 
-
         switch (state) {
             case InToken:
                 if (c == cfg_.quote_char) {
