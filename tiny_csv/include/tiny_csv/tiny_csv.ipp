@@ -15,12 +15,12 @@ template<typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>
 TINY_CSV::TinyCSV(const ParserConfig &cfg,
         const std::vector<std::string> &col_headers) :
         cfg_(cfg),
-        headers_(col_headers),
         line_tokenizer_(cfg),
         field_tokenizer_(cfg),
-        header_checked_( col_headers.empty() ),
+        headers_(col_headers),                
         data_(std::make_shared<std::vector<ColumnTypeTuple>>()),
-        indices_ { Index<IndexCols>(data_)... }
+        indices_ { Index<IndexCols>(data_)... },
+        header_checked_( col_headers.empty() )
 {}
 
 template<typename ColumnTypeTuple, typename Loaders, size_t ...IndexCols>

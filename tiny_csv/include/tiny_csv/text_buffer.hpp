@@ -30,7 +30,7 @@ public:
         return data_.data();
     }
 
-    const size_t Size() const {
+    size_t Size() const {
         return used_;
     }
 

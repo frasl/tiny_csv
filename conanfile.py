@@ -1,86 +1,45 @@
-from conans import ConanFile, CMake, tools
-import os, sys
+from conan import ConanFile
+from conan.tools.cmake import cmake_layout
+import os
 
-
-class TinyCSVConan(ConanFile):
-    def set_version(self):
-        self.version = "0.1.0"
-
+class TickTickConan(ConanFile):
     name = "tiny_csv"
-
-    generators = "cmake_find_package", "cmake"
+    version = "0.1.1"
     settings = "os", "compiler", "build_type", "arch"
+    generators = "CMakeDeps", "CMakeToolchain"
+    requires = "spdlog/1.11.0", "fmt/10.0.0", "gtest/cci.20210126"
+    #tool_requires = "gtest/cci.20210126"
+    options = {        
+    }
 
-    exports_sources = [
-        "CMakeLists.txt",
-        "tiny_csv/*",
-    ]
-    no_copy_source = True
-    build_policy = "missing"
-    _cmake = None
-         
-    def requirements(self):
-        # open-source
-        self.requires("fmt/8.1.1")
+    default_options = {
+        "boost/*:shared": False,
+        "boost/*:without_python": True,
+        "boost/*:without_graph": True
+    }
 
-    def build_requirements(self):
-        self.build_requires("gtest/cci.20210126")
+    def layout(self):
+        cmake_layout(self)
+        self.folders.build = "build"  # Set the build folder to './build'
 
-    def configure(self):
-        minimal_cpp_standard = "20"
-        if self.settings.compiler.cppstd:
-            tools.check_min_cppstd(self, minimal_cpp_standard)
-        minimal_version = {
-            "gcc": "10",
-            "clang": "10",
-        }
-        compiler = str(self.settings.compiler)
-        if compiler not in minimal_version:
-            self.output.warn(
-                (
-                    "%s recipe lacks information about the %s compiler "
-                    "standard version support"
-                )
-                % (self.name, compiler)
-            )
-            self.output.warn(
-                "%s requires a compiler that supports at least C++%s"
-                % (self.name, minimal_cpp_standard)
-            )
-            return
-
-        version = tools.Version(self.settings.compiler.version)
-        if version < minimal_version[compiler]:
-            raise ConanInvalidConfiguration(
-                "%s requires a compiler that supports at least C++%s"
-                % (self.name, minimal_cpp_standard)
-            )
-
-    def _configure_cmake(self):
-        if self._cmake:
-            return self._cmake
-
-        self._cmake = CMake(self)
-        self._cmake.configure()
-        self._cmake.definitions["CONAN_BUILD"] = True
-        return self._cmake
+    def generate(self):
+        pass
 
     def build(self):
-        cmake = self._configure_cmake()
+        pass
+
+    def package(self):
+        cmake = CMake(self)
+        cmake.install()
+        rmdir(self, os.path.join(self.package_folder, "lib", "cmake"))
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure(variables={"CONAN_BUILD": "True"})
         cmake.build()
 
     def package(self):
-        cmake = self._configure_cmake()
+        cmake = CMake(self)
         cmake.install()
-        tools.rmdir(os.path.join(self.package_folder, "lib", "cmake"))
-
-    def package_info(self):
-        self.cpp_info.names["cmake_find_package"] = "tiny_csv"
-        self.cpp_info.names["cmake_find_package_multi"] = "tiny_csv"
-
-        self.cpp_info.components["tiny_csv"].libs = ["tiny_csv"]
-        self.cpp_info.components["tiny_csv"].requires = [
-            "fmt::fmt"
-        ]
-
+        rmdir(self, os.path.join(self.package_folder, "lib", "cmake"))
 

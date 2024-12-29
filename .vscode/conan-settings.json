@@ -1,0 +1,24 @@
+{
+    "profiles": [
+        {
+            "name": "tiny_csv-Profiles found in the cache:",
+            "conanFile": "${workspaceFolder}/conanfile.py",
+            "profile": "Profiles found in the cache:",
+            "installArg": "",
+            "buildArg": "",
+            "createUser": "disroop",
+            "createChannel": "development",
+            "createArg": ""
+        },
+        {
+            "name": "tiny_csv",
+            "conanFile": "${workspaceFolder}/conanfile.py",
+            "profile": "default",
+            "installArg": "",
+            "buildArg": "",
+            "createUser": "disroop",
+            "createChannel": "development",
+            "createArg": ""
+        }
+    ]
+}

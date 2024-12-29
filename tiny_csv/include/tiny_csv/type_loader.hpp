@@ -8,6 +8,7 @@
 #include <charconv>
 #include <iomanip>
 #include <optional>
+#include <sstream>
 
 namespace tiny_csv {
 

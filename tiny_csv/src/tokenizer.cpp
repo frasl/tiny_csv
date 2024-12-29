@@ -7,9 +7,9 @@ using namespace tiny_csv;
 Tokenizer::Tokenizer(const ParserConfig &cfg) :
         buf_(nullptr),
         size_(0),
-        cfg_(cfg),
-        line_separators_( { '\n', '\r', '\0' } ),
-        token_separators_( { cfg.token_separator, '\0' } ) {}
+        cfg_(cfg),        
+        token_separators_( { cfg.token_separator, '\0' } ),
+        line_separators_( { '\n', '\r', '\0' } ) {}
 
 bool Tokenizer::NextToken(TextBuffer<char_t> &token) {
     enum State {
